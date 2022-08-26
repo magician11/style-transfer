@@ -1,0 +1,12 @@
+html {
+  background: url(style-transfer-bg.jpg) no-repeat center center fixed;
+  background-size: cover;
+}
+
+body {
+  background-color: transparent;
+}
+
+.title {
+  color: white;
+}

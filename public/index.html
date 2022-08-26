@@ -1,0 +1,223 @@
+<html lang="en">
+  <!DOCTYPE html>
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+
+    <!-- Bootstrap CSS -->
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+      integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="style-transfer.css" />
+
+    <title>Style Transfer</title>
+    <link rel="shortcut icon" type="image/png" href="palette.png" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="row justify-content-between">
+        <div class="col-sm-4 title mt-3">
+          <h1>Style Transfer</h1>
+          <p class="lead">
+            Transforming your image into art.
+          </p>
+        </div>
+        <div class="col-sm-4 mt-3 text-right">
+          <a
+            href="https://twitter.com/share?ref_src=twsrc%5Etfw"
+            class="twitter-share-button"
+            data-text="Transform your photo into art with Style Transfer"
+            data-url="https://apps.golightlyplus.com/style-transfer"
+            data-via="AndrewGolightly"
+            data-show-count="false"
+            >Tweet</a
+          ><script
+            async
+            src="https://platform.twitter.com/widgets.js"
+            charset="utf-8"
+          ></script>
+        </div>
+      </div>
+
+      <div class="row justify-content-between">
+        <div class="col-sm-5 status mt-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="card-text">Status: <span>Loading...</span></div>
+            </div>
+          </div>
+          <div class="mt-3" id="style-image" style="display: none;">
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title">Image to style with</h5>
+                <hr />
+                <img class="img-fluid" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6 mt-3 image-chooser" style="display:none;">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Select your images</h5>
+              <div class="mt-2 mb-3">
+                <hr />
+                <p>Choose the image you want to style with</p>
+                <input type="file" accept=".png,.jpg,.jpeg" id="style-file" />
+                <hr />
+                <p>Choose the image you want to style</p>
+                <input
+                  type="file"
+                  accept=".png,.jpg,.jpeg"
+                  id="image-file"
+                  aria-describedby="imageHelp"
+                />
+                <hr />
+                <button
+                  id="begin-style-transfer"
+                  class="btn btn-primary"
+                  disabled
+                >
+                  Begin Style Transfer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-lg-6 mt-3" id="selected-image" style="display: none;">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">The image to be styled</h5>
+              <hr />
+              <img class="img-fluid" />
+            </div>
+          </div>
+        </div>
+        <div
+          class="col-lg-6 mt-3"
+          id="transformed-image"
+          style="display: none;"
+        >
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Your transformed image</h5>
+              <hr />
+              <canvas id="stylized"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+      integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- docs: https://github.com/tensorflow/magenta-js/tree/master/image -->
+    <script src="https://cdn.jsdelivr.net/npm/@magenta/image@^0.2.1"></script>
+
+    <script>
+      const model = new mi.ArbitraryStyleTransferNetwork();
+      const initialize = async () => {
+        $('.status span').text('Initialising style transfer network...');
+        await model.initialize();
+        $('.status span').text('System ready!');
+        $('.image-chooser').show();
+      };
+      initialize();
+
+      const delay = ms => {
+        return new Promise(resolve => {
+          setTimeout(resolve, ms);
+        });
+      };
+
+      const checkIfReady = () => {
+        if (
+          $('#selected-image img').attr('src') &&
+          $('#style-image img').attr('src')
+        ) {
+          $('.status span').text('Ready to style');
+          $('#begin-style-transfer').attr('disabled', false);
+        }
+      };
+
+      $('#style-file').change(async e => {
+        const file = e.target.files[0];
+
+        // if the user did not select a file, do nothing
+        if (file === undefined) {
+          return;
+        }
+        const base64Image = await getBase64(file);
+        $('#style-image img').attr('src', base64Image);
+        $('#style-image').show();
+        checkIfReady();
+      });
+
+      $('#image-file').change(async e => {
+        const file = e.target.files[0];
+
+        // if the user did not select a file, do nothing
+        if (file === undefined) {
+          return;
+        }
+
+        $('#transformed-image').hide();
+        const base64Image = await getBase64(file);
+        $('#selected-image img').attr('src', base64Image);
+        $('#selected-image').show();
+        checkIfReady();
+      });
+
+      $('#begin-style-transfer').click(async () => {
+        $('#transformed-image').hide();
+        $('.status span').text('Styling your image...');
+        $('#begin-style-transfer').text('Processing...');
+        $('#begin-style-transfer').attr('disabled', true);
+        await delay(2200);
+        await transformImage();
+        $('.status span').text('Style transfer completed.');
+        $('#transformed-image').show();
+        $('#begin-style-transfer').text('Begin Style Transfer');
+        $('#begin-style-transfer').attr('disabled', false);
+      });
+
+      const transformImage = async () => {
+        const contentImg = $('#selected-image img')[0];
+        const styleImg = $('#style-image img')[0];
+        const stylizedCanvas = document.getElementById('stylized');
+        stylizedCanvas.height = contentImg.height;
+        stylizedCanvas.width = contentImg.width;
+        const imageData = await model.stylize(contentImg, styleImg);
+        stylizedCanvas.getContext('2d').putImageData(imageData, 0, 0);
+      };
+
+      // How to convert file to base64 in JavaScript: https://stackoverflow.com/a/36281449/2813041
+      const getBase64 = file => {
+        return new Promise((resolve, reject) => {
+          var reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => {
+            resolve(reader.result);
+          };
+          reader.onerror = function(error) {
+            reject(error);
+          };
+        });
+      };
+    </script>
+  </body>
+</html>
